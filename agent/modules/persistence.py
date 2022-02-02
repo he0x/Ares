@@ -34,10 +34,7 @@ def clean():
 def is_installed():
     output = os.popen(
         "reg query HKCU\Software\Microsoft\Windows\Currentversion\Run /f %s" % SERVICE_NAME)
-    if SERVICE_NAME in output.read():
-        return True
-    else:
-        return False
+    return SERVICE_NAME in output.read()
 
 
 def run(action):
@@ -55,9 +52,8 @@ def run(action):
 
 
 def help():
-    help_text = """
+    return """
     Usage: persistence install|remove|status
     Manages persistence.
 
     """
-    return help_text
