@@ -19,9 +19,8 @@ def run():
 
 
 def help():
-    help_text = """
+    return """
     Usage: screenshot
     Captures screen.
 
     """
-    return help_text

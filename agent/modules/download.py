@@ -14,9 +14,8 @@ def run(url):
 
 
 def help():
-    help_text = """
+    return """
     Usage: download http://example.com/filename
     Downloads a file through HTTP.
 
     """
-    return help_text

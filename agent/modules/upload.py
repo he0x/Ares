@@ -19,9 +19,8 @@ def run(path):
 
 
 def help():
-    help_text = """
+    return """
     Usage: upload path/to/local/file
     Uploads a file.
 
     """
-    return help_text
